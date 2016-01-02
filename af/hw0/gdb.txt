@@ -1,0 +1,4 @@
+1. The value of infile is the address 0x602010.
+2. The infile references a file object.
+3. The value of ofile is 0x0. Unlike the infile, the ofile is null and doesn't point to anything because only one argument, an input file was included as an argument.
+4. The address of the function wc is 0x4006bd.

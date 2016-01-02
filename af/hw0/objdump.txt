@@ -1,0 +1,4 @@
+1. file format is elf64-x86-64 and the architecture is i386:x86-64
+2. wc is in the .text segment with address 0x40089d
+3. main is in the .text segment with address 0x400be6
+4. no there isn't a stack or heap segment because stack and heap aren't created until runtime.

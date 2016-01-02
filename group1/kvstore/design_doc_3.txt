@@ -1,0 +1,103 @@
+CS 162
+Project 3: Key-Value Store
+Design Document
+
+
+Fill in the following information:
+
+GSI: 
+Group Number: 1
+Riva Madan <riva.madan@berkeley.edu>
+Maytas Monsereenusorn <maytasm@berkeley.edu>
+Anh Thai <anhthai@berkeley.edu>
+Tarun Chaudhry <tarun@berkeley.edu>
+
+
+1) Please write down any miscellaneous comments or notes for your GSI.
+
+
+
+KVCache and KVCacheSet
+2) Copy here the declaration of each new or changed `struct' or
+`struct' member, global or static variable, `typedef', or
+enumeration for KVCache and KVCacheSet.  Briefly identify the purpose of each.
+
+kvcacheset.h:
+  in kvcacheentry struct:
+    struct kvcacheentry *prev, *next; // for doubly-linked list
+    UT_hash_handle hh; // for hashing this struct
+  
+  in KVCacheSet struct:
+    struct kvacheentry* entry_list; // list of entries for the set
+    struct kvcacheentry *hash_ptr; // pointer to the hash table
+
+3) How will you ensure that cache accesses are very fast while also implementing the second-chance replacement policy?
+
+We will ensure that cache accesses will be fast by taking cached entries with a true referenced bit and moving them to the back, which means we wont need to iterate through as many entries. This is faster than if we didn't move it to the back because old entries that are accessed often will be at the front of the list and always have to be iterated through before getting to the entry to evict.
+
+
+Socket Server and Networking
+4) Copy here the declaration of each new or changed `struct' or
+`struct' member, global or static variable, `typedef', or
+enumeration for networking.  Briefly identify the purpose of each.
+
+In struct wq:
+pthread_mutex_t lock;  // for synchorinzation of the work queue
+pthread_cond_t cond;   // for synchorinzation of the work queue
+
+
+5) To make server_run handle multiple requests simultaneously, you will need to create new threads. However, there is a limit on the number of threads you can have running at any one time, so you cannot just fork a new thread for each incoming request. How will you achieve this?
+
+We will use a work queue with a monitor. Requests will go through the work queue and only if the maximum number of threads is not reached will a new thread be forked for that request.
+
+
+6) Why can you not just fork a new process for every request? What are the two failure modes when this occurs? Note that we are asking about forking new processes rather than spawning new threads (which is what is actually done in the project). 
+
+You cannot just fork new processes for every request simply because of resource overhead from new requests coming in to the server. The overhead is associated with processes includes the memory overhead for the process control block/process id #, the CPU for the process context switch, the inter-process communication overhead etc. The other failure is that there exists a possibility of ghost child processes. That happens when the parent exits before the forked child.
+
+7) Describe how you might test if your socket server's server_run function was working correctly (calling the appropriate handle method of kvserver/tpcmaster).
+
+`server_run()` is used to start a server (containing kvserver/tpcmaster) on a given port. As such, it will run that server indefinitely until `server_stop()` is called. Therefore, if `server_run()` works correctly, a server should boot up to handle, up to the specified max number various types of requests asynchronously. Thus, we will need to start multiple threads to send requests of various types to the server asynchronously and see if it matches the response that we expect.
+
+Single Server Key-Value Store
+8) Copy here the declaration of each new or changed `struct' or
+`struct' member, global or static variable, `typedef', or
+enumeration for the single server kv-store.  Briefly identify the purpose of each.
+
+None.
+
+9) Describe at least one end-to-end test you will add. What is the scenario you will test and how will you achieve this in the test?
+
+Another scenario for end-to-end test we will implement is putting a key, and getting it repeatedly. The end-to-end test will include starting the server and connecting. Then in the endtoend_test_client_thread, we can have a for loop, looping for a 1000 times. In each loop we would be getting the value using the key and checking the value for correctness.
+For more end-to-end test: checking to see if replacing a value works properly, deleting an invalid key returns
+
+Distributed Key-Value Store
+10) Copy here the declaration of each new or changed `struct' or
+`struct' member, global or static variable, `typedef', or
+enumeration for the distributed kv-store.  Briefly identify the purpose of each.
+
+In kvserver.c
+  tpc_state_t state;        /* State of the slave server */
+
+11) Discuss, in your own words (no copy-pasting), what you will do to handle a PUT request within TPCMaster. 
+
+During phase-1, the TPCMaster polls all the slaves via a for loop over the slave_count. If the master receives a VOTE_ABORT from any slave (a timeout is also considered as an abort response), then it will break from the loop and send out an ABORT command in phase-2. Otherwise, if the loop finishes, the master will send out a COMMIT command in phase-2. During phase-2, the master must wait for an ACK from each slave. Until an ACK arrives, the master will keep polling the slave (this can be done using a while loop that checks for the response message from the slave).
+
+12) Explain, at a high level, how you will modify kvserver_t to allow you to handle two-phase commits. 
+
+Upon receiving a request from the master, the slave will check to see if its previous log entries are committed. If yes, then it will clear the log and tpclog_log() the requested action. It will then try to see if the action (PUT or DEL) can be successfully completed by checking to see if the key exits for DEL or whether the key/value's size can fit for PUT. If nothing errors, then the slave can let the master know that it votes for COMMIT. Once the slave receives a command from the master in phase-2, it will either commit or abort the local portion of the distributed action. The slave will then record whether the action has been committed in its log before notifying the master with an ACK.
+
+13) Explain, at a high level, how you will implement kvserver_rebuild_state. How will you deal with the situation where a COMMIT message was put into the log following a PUT or DEL request, but it was not actually committed?
+
+In kvserver_rebuild_state, we will search through the log to find the last log entry and check what the message is. If a PUT, DEL, or GET request is the last in the log, it will send either VOTE_ABORT or VOTE_COMMIT and then wait for a COMMIT or ABORT from the master. If it is an ABORT message it will do nothing. If a COMMIT message was put into the log, but not actually committed, the server will return to completing the commit and send an ACK. 
+
+
+14) In this project, we did not ask you to consider that TPCMaster might ever fail. What would you need to add to handle this type of failure?
+
+We would need to add a TPC log to the TPCMaster so that it can recover after failure.
+
+
+15) This project is optimized for a read heavy system (since writes are so slow). How would you modify this project (while keeping all the slaves) for a write heavy system?
+
+For a write heavy system, write-back instead of write-through should be used for the cache. Writing to disk takes a long time, so we wouldn't want to be doing that for every write.
+

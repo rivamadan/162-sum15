@@ -1,0 +1,5 @@
+1. main in .text, recur in .text, static data (stuff) in .data
+2. the stack is growing downwards because the addresses are decreasing
+3. each stack frame is 48 bytes
+4. the stack is growing upwards because the addresses are increasing
+5. no, there are more than 100 bytes (the amount allocated in malloc 1) between them

@@ -1,0 +1,3 @@
+stack size: 8388608
+process limit: 7874
+max file descriptors: 1024
